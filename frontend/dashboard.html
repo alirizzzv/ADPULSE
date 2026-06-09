@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ADPULSE — Live Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  .page { padding: 0 26px 56px; max-width: 1480px; margin: 0 auto; }
+
+  .topbar { position: sticky; top: 0; z-index: 50; display:flex; align-items:center; gap: 16px;
+    padding: 13px 18px; margin: 14px 0 22px; border-radius: var(--r);
+    background: rgba(8,11,20,0.78); backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid var(--stroke); box-shadow: var(--shadow); }
+  .topbar .live-pill { display:flex; align-items:center; gap:9px; font-family:var(--mono); font-weight:600; font-size:0.74rem; letter-spacing:0.1em;
+    padding:7px 13px; border-radius:3px; background: rgba(47,211,154,0.09); border:1px solid rgba(47,211,154,0.24); }
+  .topbar .spacer { flex: 1; }
+  .topbar .lbl { font-size:0.76rem; color:var(--text-2); font-family:var(--mono); letter-spacing:0.04em; }
+  .budget-mini { display:flex; align-items:center; gap:10px; font-size:0.78rem; }
+  .budget-mini .bar { width:150px; height:6px; background: rgba(120,150,210,0.1); border-radius:999px; overflow:hidden; }
+  .budget-mini .fill { height:100%; width:0%; background: var(--line); transition: width 500ms var(--ease); box-shadow: 0 0 8px rgba(47,107,255,0.7); }
+
+  .kpis { display:grid; grid-template-columns: repeat(4,1fr); gap: var(--gap-l); margin-bottom: var(--gap-l); }
+  .kpi { border-top-width: 2px; }
+  .kpi .top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .kpi .label { color: var(--text-2); font-size: 0.72rem; text-transform: uppercase; letter-spacing:0.12em; font-family:var(--mono); }
+  .kpi .ic { width:32px; height:32px; border-radius:var(--r); display:grid; place-items:center;
+             background: rgba(120,150,210,0.06); border:1px solid var(--stroke-2); }
+  .kpi .value { font-family: var(--font-display); font-size: 2.25rem; font-weight: 700; line-height:1; margin-bottom: 8px; font-variant-numeric: tabular-nums; letter-spacing:-0.02em; }
+  .kpi .meta { font-size: 0.78rem; color: var(--text-2); }
+  .kpi .progress { height:4px; background: rgba(120,150,210,0.1); border-radius:999px; overflow:hidden; margin-top:12px; }
+  .kpi .progress .fill { height:100%; width:0%; transition: width 500ms var(--ease), background 300ms; }
+  .kpi.accent-blue   { border-top-color: var(--blue); }    .kpi.accent-blue   .ic { color:var(--blue-2); }
+  .kpi.accent-cyan   { border-top-color: var(--cyan); }    .kpi.accent-cyan   .ic { color:var(--cyan); }
+  .kpi.accent-violet { border-top-color: #6d8bff; }        .kpi.accent-violet .ic { color:#8aa3ff; }
+  .kpi.accent-green  { border-top-color: var(--success); } .kpi.accent-green  .ic { color:var(--success); }
+
+  .charts { display:grid; grid-template-columns: 3fr 2fr; gap: var(--gap-l); margin-bottom: var(--gap-l); }
+  .chart-card h3 { font-size: 0.94rem; margin-bottom: 4px; }
+  .chart-card .chsub { font-size:0.76rem; color:var(--text-2); margin-bottom:16px; display:flex; gap:16px; font-family:var(--mono); }
+  .chart-card .lg { display:inline-flex; align-items:center; gap:6px; }
+  .chart-card .lg .d { width:8px; height:8px; border-radius:2px; }
+  .chart-wrap { position: relative; height: 240px; }
+
+  .feed-head { display:flex; align-items:center; justify-content:space-between; margin-bottom: 16px; }
+  .feed-head h3 { font-size: 0.94rem; }
+  .feed-head .right { display:flex; align-items:center; gap:12px; }
+  .table-scroll { max-height: 470px; overflow-y: auto; margin: 0 -6px; padding: 0 6px; }
+  table.feed { width:100%; border-collapse: collapse; font-size: 0.84rem; }
+  table.feed th, table.feed td { text-align:left; padding: 10px 12px; white-space: nowrap; }
+  table.feed thead th { color: var(--text-2); font-size: 0.68rem; text-transform: uppercase; letter-spacing:0.1em; font-family:var(--mono);
+    position: sticky; top:0; z-index:2; background: rgba(8,11,20,0.96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--stroke-2); }
+  table.feed tbody td { border-bottom: 1px solid rgba(120,150,210,0.06); }
+  table.feed td.mono { font-family: var(--mono); font-size:0.8rem; }
+  table.feed tbody tr { animation: fadeInDown 320ms var(--ease); transition: background 150ms var(--ease); }
+  table.feed tbody tr:hover { background: rgba(120,150,210,0.05); }
+  table.feed tr.won-row td { box-shadow: inset 2px 0 0 var(--success); }
+  table.feed tr.dim-row td { opacity: 0.4; }
+  table.feed tr.hl-row td  { background: rgba(47,107,255,0.09); box-shadow: inset 2px 0 0 var(--blue); }
+
+  .gauge-row { display:grid; grid-template-columns: 250px 1fr; gap: 40px; align-items:center; }
+  .gauge-wrap { position: relative; height: 196px; }
+  .gauge-center { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .gauge-center .pct { font-family:var(--font-display); font-size: 2rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .gauge-center .lbl { font-family:var(--mono); font-size: 0.68rem; color: var(--text-2); text-transform:uppercase; letter-spacing:0.14em; }
+  .gauge-stats { display:flex; gap: 46px; flex-wrap:wrap; }
+  .gauge-stats .s .v { font-family:var(--font-display); font-size: 1.5rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .gauge-stats .s .l { font-family:var(--mono); font-size: 0.7rem; color: var(--text-2); text-transform:uppercase; letter-spacing:0.1em; margin-top:3px; }
+
+  .section-card { margin-bottom: var(--gap-l); }
+  @media (max-width: 1040px){ .kpis{grid-template-columns:repeat(2,1fr);} .charts{grid-template-columns:1fr;} .gauge-row{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <a href="/" class="logo"><span class="a">AD</span><span class="b">PULSE</span></a>
+    <div class="live-pill"><span id="liveDot" class="live-dot off"></span><span id="liveText">CONNECTING…</span></div>
+    <div class="spacer"></div>
+    <label class="lbl">HIGHLIGHT
+      <select id="advSelect" style="margin-left:6px">
+        <option value="all">All advertisers</option>
+        <option value="1458">1458 · Clicks (N=0)</option>
+        <option value="3358">3358 · Balanced (N=2)</option>
+        <option value="3386">3386 · Clicks (N=0)</option>
+        <option value="3427">3427 · Clicks (N=0)</option>
+        <option value="3476">3476 · Conversions (N=10)</option>
+      </select>
+    </label>
+    <div class="budget-mini">
+      <span class="lbl">BUDGET</span>
+      <div class="bar"><div id="budgetMiniFill" class="fill"></div></div>
+      <span id="budgetMiniPct" class="mono">0%</span>
+    </div>
+    <a class="btn btn-outline" href="/bidtester" style="padding:9px 16px;">Bid Tester ↗</a>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpis">
+    <div class="card kpi accent-blue">
+      <div class="top"><span class="label">Total Auctions</span>
+        <span class="ic"><svg class="ico" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span></div>
+      <div class="value" id="kpiAuctions">0</div>
+      <div class="meta" id="kpiAuctionsMeta">Bids placed</div>
+    </div>
+    <div class="card kpi accent-cyan">
+      <div class="top"><span class="label">Win Rate</span>
+        <span class="ic"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="0.6" fill="currentColor"/></svg></span></div>
+      <div class="value" id="kpiWinRate">0%</div>
+      <div class="meta" id="kpiWinMeta">0 won / 0 lost</div>
+    </div>
+    <div class="card kpi accent-violet">
+      <div class="top"><span class="label">Budget Spent</span>
+        <span class="ic"><svg class="ico" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span></div>
+      <div class="value" id="kpiBudget">0</div>
+      <div class="meta" id="kpiBudgetMeta">of 0 total</div>
+      <div class="progress"><div id="kpiBudgetFill" class="fill"></div></div>
+    </div>
+    <div class="card kpi accent-green">
+      <div class="top"><span class="label">Score</span>
+        <span class="ic"><svg class="ico" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M21 3v5h-5"/></svg></span></div>
+      <div class="value" id="kpiScore">0</div>
+      <div class="meta" id="kpiScoreMeta">0 clicks + 0 conversions</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts">
+    <div class="card framed chart-card">
+      <h3>Bid Price Over Time</h3>
+      <div class="chsub">
+        <span class="lg"><span class="d" style="background:var(--blue-2)"></span>OUR BID</span>
+        <span class="lg"><span class="d" style="background:var(--muted)"></span>FLOOR</span>
+      </div>
+      <div class="chart-wrap"><canvas id="bidChart"></canvas></div>
+    </div>
+    <div class="card framed chart-card">
+      <h3>CTR vs CVR Predictions</h3>
+      <div class="chsub">
+        <span class="lg"><span class="d" style="background:var(--blue-2)"></span>CTR</span>
+        <span class="lg"><span class="d" style="background:var(--cyan)"></span>CVR</span>
+      </div>
+      <div class="chart-wrap"><canvas id="probChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- LIVE FEED -->
+  <div class="card framed section-card">
+    <div class="feed-head">
+      <h3>Live Auction Feed</h3>
+      <div class="right">
+        <span class="pill pill-blue"><span id="feedCount">0</span> PROCESSED</span>
+        <button id="pauseBtn" class="btn btn-outline" style="padding:9px 16px;">⏸ Pause</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="feed">
+        <thead><tr>
+          <th>Time</th><th>Bid ID</th><th>Advertiser</th><th>CTR</th><th>CVR</th>
+          <th>Our Bid</th><th>Result</th><th>Pay</th><th>Exec</th>
+        </tr></thead>
+        <tbody id="feedBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BUDGET GAUGE -->
+  <div class="card framed section-card">
+    <h3 style="font-size:0.94rem;margin-bottom:20px;">Budget Utilisation</h3>
+    <div class="gauge-row">
+      <div class="gauge-wrap">
+        <canvas id="gaugeChart"></canvas>
+        <div class="gauge-center"><div class="pct" id="gaugePct">0%</div><div class="lbl">SPENT</div></div>
+      </div>
+      <div class="gauge-stats">
+        <div class="s"><div class="v mono" id="gSpent">0</div><div class="l">Spent</div></div>
+        <div class="s"><div class="v mono" id="gRemain">0</div><div class="l">Remaining</div></div>
+        <div class="s"><div class="v mono" id="gReqs">0</div><div class="l">Requests seen</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_URL = window.location.origin;
+const MAX_ROWS = 50, MAX_POINTS = 40;
+const state = { paused:false, highlight:"all", processed:0 };
+const $ = id => document.getElementById(id);
+
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#54607a';
+const grid = { color:'rgba(120,150,210,0.07)', drawTicks:false };
+const baseOpts = { responsive:true, maintainAspectRatio:false, animation:false,
+  plugins:{ legend:{display:false},
+    tooltip:{ backgroundColor:'#0a0e1a', borderColor:'rgba(120,150,210,0.2)', borderWidth:1, padding:10, cornerRadius:4, titleColor:'#e9eefb', bodyColor:'#8e9bba' } } };
+
+const bidCtx = document.getElementById('bidChart').getContext('2d');
+const fill = bidCtx.createLinearGradient(0,0,0,240);
+fill.addColorStop(0,'rgba(47,107,255,0.32)'); fill.addColorStop(1,'rgba(47,107,255,0)');
+const bidChart = new Chart(bidCtx, {
+  type:'line',
+  data:{ labels:[], datasets:[
+    { data:[], borderColor:'#5b9bff', backgroundColor:fill, tension:0.4, pointRadius:0, borderWidth:2.5, fill:true, spanGaps:true },
+    { data:[], borderColor:'#54607a', borderDash:[5,5], tension:0.4, pointRadius:0, borderWidth:1.5 }
+  ]},
+  options:{ ...baseOpts, scales:{ x:{ grid, ticks:{maxTicksLimit:6} }, y:{ grid, beginAtZero:true } } }
+});
+
+const probChart = new Chart(document.getElementById('probChart'), {
+  type:'line',
+  data:{ labels:[], datasets:[
+    { data:[], borderColor:'#5b9bff', tension:0.4, pointRadius:0, borderWidth:2.5 },
+    { data:[], borderColor:'#38bdf8', tension:0.4, pointRadius:0, borderWidth:2.5 }
+  ]},
+  options:{ ...baseOpts, scales:{ x:{ grid, ticks:{display:false} }, y:{ grid, beginAtZero:true, ticks:{ callback:v=>(v*100).toFixed(2)+'%' } } } }
+});
+
+const gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+  type:'doughnut',
+  data:{ datasets:[{ data:[0,100], backgroundColor:['#2f6bff','rgba(120,150,210,0.08)'], borderWidth:0, circumference:270, rotation:225, borderRadius:6 }] },
+  options:{ cutout:'74%', plugins:{ legend:{display:false}, tooltip:{enabled:false} }, animation:{duration:400}, responsive:true, maintainAspectRatio:false }
+});
+
+const fmt = n => Math.round(n).toLocaleString();
+const pct = n => (n*100).toFixed(3) + '%';
+const shortId = s => (s||'').slice(0,8) + '…';
+const hhmmss = ts => (!ts||ts.length<14) ? new Date().toLocaleTimeString() : ts.slice(8,10)+':'+ts.slice(10,12)+':'+ts.slice(12,14);
+const colorForLoad = p => p>=95 ? '#f76d83' : p>=80 ? '#f5b53d' : '#2f6bff';
+
+const lastVals = {};
+function setValue(el, to, suffix=''){
+  const id = el.id, from = lastVals[id] ?? 0;
+  if(from === to) return; lastVals[id] = to;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  const dur = 450, t0 = performance.now();
+  const step = now => { const k = Math.min((now-t0)/dur,1), e = 1-Math.pow(1-k,3);
+    el.textContent = fmt(from + (to-from)*e) + suffix; if(k<1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function pushPoint(chart, label, values){
+  chart.data.labels.push(label); values.forEach((v,i)=> chart.data.datasets[i].data.push(v));
+  if(chart.data.labels.length > MAX_POINTS){ chart.data.labels.shift(); chart.data.datasets.forEach(d=>d.data.shift()); }
+  chart.update('none');
+}
+
+function addFeedRow(d){
+  const body = $('feedBody'); const tr = document.createElement('tr');
+  const resultPill = d.result==='WON' ? '<span class="pill pill-won">WON</span>'
+                   : d.result==='LOST'? '<span class="pill pill-lost">LOST</span>'
+                   :                     '<span class="pill pill-skip">SKIPPED</span>';
+  if(d.result==='WON') tr.classList.add('won-row');
+  if(d.result==='SKIPPED') tr.classList.add('dim-row');
+  if(state.highlight!=='all' && String(d.advertiser_id)===state.highlight) tr.classList.add('hl-row');
+  if(state.highlight!=='all' && String(d.advertiser_id)!==state.highlight) tr.classList.add('dim-row');
+  tr.innerHTML = `
+    <td class="mono dim">${hhmmss(d.timestamp)}</td>
+    <td class="mono">${shortId(d.bid_id)}</td>
+    <td class="mono">${d.advertiser_id} <span class="dim">N=${d.n_value}</span></td>
+    <td class="mono" style="color:var(--blue-2)">${pct(d.ctr)}</td>
+    <td class="mono" style="color:var(--cyan)">${pct(d.cvr)}</td>
+    <td class="mono">${d.bid_price===-1?'—':d.bid_price}</td>
+    <td>${resultPill}</td>
+    <td class="mono dim">${d.pay_price?d.pay_price:'—'}</td>
+    <td class="mono dim">${d.execution_time_ms}ms</td>`;
+  body.insertBefore(tr, body.firstChild);
+  while(body.children.length > MAX_ROWS) body.removeChild(body.lastChild);
+}
+
+function renderStats(s){
+  setValue($('kpiAuctions'), s.total_auctions);
+  $('kpiAuctionsMeta').textContent = fmt(s.requests_seen)+' requests · '+fmt(s.skipped)+' skipped';
+  setValue($('kpiWinRate'), s.win_rate, '%');
+  $('kpiWinMeta').textContent = fmt(s.wins)+' won / '+fmt(s.losses)+' lost';
+  setValue($('kpiBudget'), s.budget_spent);
+  $('kpiBudgetMeta').textContent = 'of '+fmt(s.budget_total)+' total';
+  const bc = colorForLoad(s.budget_pct);
+  $('kpiBudgetFill').style.width = Math.min(s.budget_pct,100)+'%'; $('kpiBudgetFill').style.background = bc;
+  setValue($('kpiScore'), s.score);
+  $('kpiScoreMeta').textContent = fmt(s.clicks)+' clicks + '+fmt(s.conversions)+' conversions';
+  $('budgetMiniFill').style.width = Math.min(s.budget_pct,100)+'%';
+  $('budgetMiniPct').textContent = s.budget_pct+'%';
+  gaugeChart.data.datasets[0].data = [Math.min(s.budget_pct,100), Math.max(100-s.budget_pct,0)];
+  gaugeChart.data.datasets[0].backgroundColor = [bc, 'rgba(120,150,210,0.08)'];
+  gaugeChart.update('none');
+  $('gaugePct').textContent = s.budget_pct+'%';
+  $('gSpent').textContent = fmt(s.budget_spent);
+  $('gRemain').textContent = fmt(s.budget_remaining);
+  $('gReqs').textContent = fmt(s.requests_seen);
+}
+
+const socket = io(API_URL, { transports:['websocket','polling'] });
+socket.on('connect',    ()=>{ $('liveDot').classList.remove('off'); $('liveText').textContent='LIVE'; });
+socket.on('disconnect', ()=>{ $('liveDot').classList.add('off');    $('liveText').textContent='OFFLINE'; });
+socket.on('bid_result', d=>{
+  if(state.paused) return;
+  $('feedCount').textContent = fmt(++state.processed);
+  addFeedRow(d);
+  pushPoint(bidChart, hhmmss(d.timestamp), [ d.bid_price===-1?null:d.bid_price, d.floor_price ]);
+  pushPoint(probChart, '', [ d.ctr, d.cvr ]);
+});
+socket.on('stats_update', d=>{ if(!state.paused) renderStats(d); });
+
+$('pauseBtn').addEventListener('click', ()=>{
+  state.paused = !state.paused;
+  socket.emit('set_paused', { paused: state.paused });
+  $('pauseBtn').textContent = state.paused ? '▶ Resume' : '⏸ Pause';
+  $('liveText').textContent = state.paused ? 'PAUSED' : 'LIVE';
+  $('liveDot').classList.toggle('off', state.paused);
+});
+$('advSelect').addEventListener('change', e=>{ state.highlight = e.target.value; });
+fetch(API_URL+'/api/stats').then(r=>r.json()).then(renderStats).catch(()=>{});
+</script>
+</body>
+</html>

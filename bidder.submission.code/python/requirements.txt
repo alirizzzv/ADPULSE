@@ -1,0 +1,12 @@
+# ADPULSE backend dependencies
+# Pin scikit-learn to the version the .pkl models were trained with (1.2.2)
+# to avoid unpickling incompatibilities.
+flask==3.0.3
+flask-cors==4.0.1
+flask-socketio==5.3.6
+python-socketio==5.11.2
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.2.2
+lightgbm==4.3.0
+joblib==1.4.2

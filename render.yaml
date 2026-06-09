@@ -1,0 +1,17 @@
+# Render Blueprint — one-click deploy of the ADPULSE container.
+# In Render: New + → Blueprint → connect this repo → it reads this file.
+services:
+  - type: web
+    name: adpulse
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DEMO_BID_SCALE
+        value: "8000"
+      - key: DEMO_OUTCOME_SCALE
+        value: "1000"
+      - key: OUTCOME_MODE
+        value: "model"

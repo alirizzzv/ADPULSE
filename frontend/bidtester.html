@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ADPULSE — Bid Tester</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .page { max-width: 1140px; margin: 0 auto; padding: 0 32px 56px; }
+  .topbar { display:flex; align-items:center; gap:20px; padding: 18px 0 22px; margin-bottom:8px; }
+  .topbar .spacer { flex:1; }
+  .topbar .links { display:flex; gap:22px; font-size:0.9rem; }
+  .topbar .links a { color:var(--text-2); font-weight:500; }
+  .topbar .links a:hover { color:var(--text); }
+
+  .head { margin: 14px 0 32px; }
+  .head h1 { font-size: 2.1rem; margin: 14px 0 8px; }
+  .head .lead { color: var(--text-2); max-width:600px; }
+
+  .cols { display:grid; grid-template-columns: 0.95fr 1.05fr; gap: var(--gap-l); align-items:start; }
+
+  .form-section { margin-bottom: 24px; }
+  .form-section h4 { font-family:var(--mono); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.14em; color:var(--blue-2); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+  .form-section h4::before { content:""; width:16px; height:1px; background:var(--line); }
+  .field { margin-bottom: 14px; }
+  .field label { display:block; font-size:0.8rem; margin-bottom:7px; color: var(--text-2); }
+  .field select, .field input { width:100%; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  .result-placeholder { color: var(--text-2); text-align:center; padding: 76px 24px; }
+  .result-placeholder .ico { width:40px; height:40px; margin:0 auto 16px; color:var(--muted); stroke-width:1.2; }
+
+  .bid-banner { text-align:center; padding: 30px; border-radius:var(--r); margin-bottom:20px; position:relative; overflow:hidden; }
+  .bid-banner.bid  { background: radial-gradient(120% 150% at 50% 0%, rgba(47,211,154,0.2), transparent 62%); border:1px solid rgba(47,211,154,0.3); }
+  .bid-banner.nobid{ background: radial-gradient(120% 150% at 50% 0%, rgba(247,109,131,0.18), transparent 62%); border:1px solid rgba(247,109,131,0.3); }
+  .bid-banner .lbl { font-family:var(--mono); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.16em; color:var(--text-2); }
+  .bid-banner .amt { font-family:var(--font-display); font-size:3rem; font-weight:700; margin-top:8px; letter-spacing:-0.02em; }
+  .bid-banner.bid .amt  { color: var(--success); }
+  .bid-banner.nobid .amt{ color: var(--danger); }
+
+  .breakdown { width:100%; border-collapse:collapse; font-size:0.9rem; }
+  .breakdown td { padding:11px 6px; border-bottom:1px solid var(--stroke); }
+  .breakdown tr:last-child td { border-bottom:none; }
+  .breakdown td:first-child { color: var(--text-2); }
+  .breakdown td:last-child { text-align:right; font-family:var(--mono); }
+  .breakdown tr.total td { padding-top:14px; }
+  .breakdown tr.total td:last-child { font-size:1.05rem; color:var(--text); }
+
+  details.adv { margin-top:18px; background:rgba(120,150,210,0.04); border:1px solid var(--stroke); border-radius:var(--r); padding:14px 18px; }
+  details.adv summary { cursor:pointer; font-weight:600; font-size:0.9rem; list-style:none; display:flex; justify-content:space-between; }
+  details.adv summary::after { content:"+"; color:var(--text-2); font-family:var(--mono); }
+  details.adv[open] summary::after { content:"−"; }
+  details.adv table { width:100%; margin-top:12px; font-size:0.85rem; }
+  details.adv td { padding:7px 4px; border-bottom:1px solid var(--stroke); color:var(--text-2); }
+  details.adv td:last-child { text-align:right; font-family:var(--mono); color:var(--text); }
+
+  .hist { margin-top:24px; }
+  .hist h3 { font-size:0.96rem; margin-bottom:14px; }
+  .hist table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+  .hist th, .hist td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--stroke); }
+  .hist th { color:var(--text-2); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; font-family:var(--mono); }
+  .hist tbody tr { transition: background 150ms var(--ease); }
+  .hist tbody tr:hover { background: rgba(120,150,210,0.05); }
+  .hist td.mono { font-family:var(--mono); }
+
+  .err { background: rgba(247,109,131,0.12); color: var(--danger); border:1px solid rgba(247,109,131,0.3); padding:15px 18px; border-radius:var(--r); font-size:0.9rem; }
+
+  @media (max-width:880px){ .cols{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="topbar">
+    <a href="/" class="logo"><span class="a">AD</span><span class="b">PULSE</span></a>
+    <div class="spacer"></div>
+    <div class="links"><a href="/dashboard">Dashboard</a><a href="/">Home</a></div>
+  </div>
+
+  <div class="head">
+    <span class="eyebrow">LIVE INFERENCE</span>
+    <h1>Bid <span class="hl">Tester</span></h1>
+    <p class="lead">Enter bid-request parameters and the real LightGBM models compute the bid price live — in milliseconds.</p>
+  </div>
+
+  <div class="cols">
+    <!-- FORM -->
+    <div class="card framed">
+      <form id="bidForm">
+        <div class="form-section">
+          <h4>User Context</h4>
+          <div class="field">
+            <label>User Agent</label>
+            <select name="userAgent">
+              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36">Desktop · Chrome · Windows</option>
+              <option value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15">Desktop · Safari · macOS</option>
+              <option value="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0">Desktop · Firefox · Windows</option>
+              <option value="Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36">Mobile · Chrome · Android</option>
+              <option value="Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1">Mobile · Safari · iOS</option>
+              <option value="Mozilla/5.0 (iPad; CPU OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1">Tablet · iPad</option>
+            </select>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Region code</label><input type="number" name="region" value="15" /></div>
+            <div class="field"><label>City code</label><input type="number" name="city" value="16" /></div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h4>Ad Slot</h4>
+          <div class="row2">
+            <div class="field"><label>Floor price</label><input type="number" name="adSlotFloorPrice" value="0" /></div>
+            <div class="field"><label>Ad exchange</label><input type="number" name="adExchange" value="2" /></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Width</label><input type="number" name="adSlotWidth" value="300" /></div>
+            <div class="field"><label>Height</label><input type="number" name="adSlotHeight" value="250" /></div>
+          </div>
+          <div class="row2">
+            <div class="field"><label>Visibility</label>
+              <select name="adSlotVisibility"><option>FirstView</option><option>SecondView</option><option>Na</option></select></div>
+            <div class="field"><label>Format</label>
+              <select name="adSlotFormat"><option>Fixed</option><option>Pop</option><option>Background</option><option>Float</option><option>Na</option></select></div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h4>Advertiser</h4>
+          <div class="field">
+            <label>Advertiser ID</label>
+            <select name="advertiserId">
+              <option value="1458">1458 · Clicks Only (N=0)</option>
+              <option value="3358">3358 · Balanced (N=2)</option>
+              <option value="3386">3386 · Clicks Only (N=0)</option>
+              <option value="3427">3427 · Clicks Only (N=0)</option>
+              <option value="3476" selected>3476 · Conversion Focused (N=10)</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">Get Bid Price →</button>
+      </form>
+    </div>
+
+    <!-- RESULT -->
+    <div class="card framed" id="resultCard">
+      <div class="result-placeholder" id="placeholder">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Fill in parameters and click <b style="color:var(--text)">Get Bid Price</b><br/>to see the model's live prediction.
+      </div>
+      <div id="resultBody" style="display:none;"></div>
+    </div>
+  </div>
+
+  <div class="hist card framed" id="histCard" style="display:none;">
+    <h3>Recent Tests</h3>
+    <table>
+      <thead><tr><th>Advertiser</th><th>CTR</th><th>CVR</th><th>N</th><th>Bid</th><th>Exec</th></tr></thead>
+      <tbody id="histBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const API_URL = window.location.origin;
+const $ = id => document.getElementById(id);
+const pct = n => (n*100).toFixed(3) + '%';
+const history = [];
+
+$('bidForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData(e.target); const params = {};
+  fd.forEach((v,k)=> params[k]=v);
+  ['region','city','adSlotFloorPrice','adExchange','adSlotWidth','adSlotHeight','advertiserId'].forEach(k=> params[k]=Number(params[k]));
+
+  $('placeholder').style.display='none'; $('resultBody').style.display='block';
+  $('resultBody').innerHTML = '<p class="muted center" style="padding:40px">Running models…</p>';
+  try {
+    const res = await fetch(API_URL+'/api/bid', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(params) });
+    const d = await res.json();
+    if(!res.ok) throw new Error(d.error || 'Request failed');
+    renderResult(d); addHistory(d);
+  } catch(err){ $('resultBody').innerHTML = '<div class="err">⚠ '+err.message+'</div>'; }
+});
+
+function renderResult(d){
+  const bidding = d.bid_price !== -1;
+  const banner = bidding
+    ? `<div class="bid-banner bid"><div class="lbl">Bid Decision</div><div class="amt">${d.bid_price} <span style="font-size:1.1rem;color:var(--text-2)">CPM</span></div></div>`
+    : `<div class="bid-banner nobid"><div class="lbl">Bid Decision</div><div class="amt">NO BID</div></div>`;
+  $('resultBody').innerHTML = `${banner}
+    <table class="breakdown">
+      <tr><td>CTR Prediction</td><td style="color:var(--blue-2)">${d.ctr.toExponential(3)} &nbsp;(${pct(d.ctr)})</td></tr>
+      <tr><td>CVR Prediction</td><td style="color:var(--cyan)">${d.cvr.toExponential(3)} &nbsp;(${pct(d.cvr)})</td></tr>
+      <tr><td>N Value</td><td>${d.n_value}</td></tr>
+      <tr><td>Estimated Value <span class="dim">CTR×(1+N×CVR)</span></td><td>${d.estimated_value.toFixed(5)}</td></tr>
+      <tr><td>Base Bid</td><td>${d.base_bid}</td></tr>
+      <tr><td>Raw Bid <span class="dim">base×est</span></td><td>${d.raw_bid}</td></tr>
+      <tr><td>Floor Price</td><td>${d.floor_price}</td></tr>
+      <tr class="total"><td><b>Final Bid</b></td><td><b>${d.bid_price===-1?'— (no bid)':d.bid_price+' CPM'}</b>${d.capped?' <span class="pill pill-blue">capped</span>':''}</td></tr>
+      <tr><td>Execution Time</td><td style="color:var(--success)">${d.execution_time_ms} ms</td></tr>
+    </table>
+    <details class="adv"><summary>Advanced — formula &amp; raw values</summary>
+      <p class="muted" style="margin:12px 0;font-size:0.85rem;">Formula: <span class="mono">bid = base_bid × CTR × (1 + N × CVR)</span><br/>
+        = ${d.base_bid} × ${d.ctr.toExponential(2)} × (1 + ${d.n_value} × ${d.cvr.toExponential(2)}) = <b style="color:var(--text)">${d.raw_bid}</b>, then floor/cap applied.</p>
+      <table>
+        <tr><td>Bid ID</td><td>${d.bid_id.slice(0,16)}…</td></tr>
+        <tr><td>Timestamp</td><td>${d.timestamp}</td></tr>
+        <tr><td>Advertiser ID</td><td>${d.advertiser_id}</td></tr>
+      </table>
+    </details>`;
+}
+
+function addHistory(d){
+  history.unshift(d); if(history.length>5) history.pop();
+  $('histCard').style.display='block';
+  $('histBody').innerHTML = history.map(h=>`<tr>
+      <td class="mono">${h.advertiser_id}</td>
+      <td class="mono" style="color:var(--blue-2)">${pct(h.ctr)}</td>
+      <td class="mono" style="color:var(--cyan)">${pct(h.cvr)}</td>
+      <td class="mono">${h.n_value}</td>
+      <td class="mono">${h.bid_price===-1?'—':h.bid_price}</td>
+      <td class="mono dim">${h.execution_time_ms}ms</td></tr>`).join('');
+}
+</script>
+</body>
+</html>

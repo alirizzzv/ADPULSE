@@ -1,0 +1,17 @@
+# IPinYou dataset (multi-GB) — keep the folder + README, ignore the heavy data
+dataset/*
+!dataset/README.md
+dataset.7z
+
+# Python
+bidder.submission.code/python/__pycache__/
+bidder.submission.code/python/venv/
+**/__pycache__/
+*.pyc
+
+# OS / editor
+.DS_Store
+
+# misc
+documentation.md
+adobe devfest.pdf

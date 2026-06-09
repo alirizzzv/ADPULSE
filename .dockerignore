@@ -1,0 +1,21 @@
+# keep the image lean & safe
+.git/
+.gitignore
+**/__pycache__/
+*.pyc
+*.pyo
+
+# virtualenvs (rebuilt inside the image)
+venv/
+bidder.submission.code/python/venv/
+
+# the multi-GB IPinYou dataset — app falls back to synthetic without it
+dataset/
+
+# misc / large local-only files
+*.7z
+documentation.md
+adobe devfest.pdf
+output.txt
+.DS_Store
+.claude/

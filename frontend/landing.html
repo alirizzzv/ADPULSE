@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ADPULSE — Real-Time Bidding Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="theme.css" />
+<style>
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+
+  /* scroll progress bar */
+  #scrollbar { position: fixed; top: 0; left: 0; height: 2px; width: 0%; z-index: 100;
+               background: var(--line); box-shadow: 0 0 12px rgba(56,189,248,0.6); }
+
+  .topnav { display:flex; align-items:center; justify-content:space-between; padding: 20px 0; position:sticky; top:0; z-index:50; backdrop-filter: blur(10px); }
+  .topnav .links { display:flex; gap: 26px; align-items:center; font-size:0.9rem; }
+  .topnav .links a { color: var(--text-2); font-weight:500; }
+  .topnav .links a:hover { color: var(--text); }
+
+  /* ---- HERO (split: copy + live globe) ---- */
+  .hero { display:grid; grid-template-columns: 1.04fr 0.96fr; align-items:center; gap: 36px;
+          padding: 54px 0 54px; min-height: 64vh; position:relative; }
+  .hero-copy { text-align:left; }
+  .hero h1 { font-size: clamp(2.5rem, 5vw, 3.9rem); margin: 22px 0 18px; letter-spacing:-0.04em; }
+  .hero .sub { font-size: 1.1rem; color: var(--text-2); max-width: 520px; margin: 0 0 32px; }
+  .hero .cta { display:flex; gap: 14px; flex-wrap:wrap; }
+  .hero .stats { display:flex; gap:30px; margin-top:46px; flex-wrap:wrap; }
+  .hero .stats .s .n { font-family:var(--font-display); font-size:1.45rem; font-weight:700; color:var(--text); }
+  .hero .stats .s .l { font-family:var(--mono); font-size:0.68rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--text-2); margin-top:4px; }
+
+  /* globe */
+  .globe-stage { position:relative; width:100%; aspect-ratio: 1 / 1; max-height: 540px; display:grid; place-items:center; overflow:hidden; }
+  #globe-hero { width:100%; height:100%; position:relative; cursor: grab; display:grid; place-items:center; }
+  #globe-hero canvas { display:block; }
+  #globe-hero:active { cursor: grabbing; }
+  .globe-hud { position:absolute; top:6px; left:6px; z-index:6; display:flex; align-items:center; gap:9px;
+               font-family:var(--mono); font-size:0.68rem; letter-spacing:0.12em; text-transform:uppercase;
+               background: rgba(8,11,20,0.55); border:1px solid var(--stroke-2); border-radius: var(--r);
+               padding: 6px 11px; backdrop-filter: blur(8px); color: var(--text-2); }
+  .globe-hud .gh-count { color: var(--cyan); font-weight:600; }
+  .globe-cap { position:absolute; bottom:2px; left:50%; transform:translateX(-50%); z-index:6;
+               font-family:var(--mono); font-size:0.66rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+  .globe-glow { position:absolute; inset:8% 8% 8% 8%; border-radius:50%; z-index:-1;
+                background: radial-gradient(circle at 50% 45%, rgba(47,107,255,0.22), transparent 62%); filter: blur(22px); }
+
+  section { padding: var(--gap-section) 0; }
+  .sec-head { margin-bottom: 40px; }
+  .sec-head h2 { font-size: clamp(1.7rem, 3vw, 2.4rem); margin: 16px 0 10px; }
+  .sec-head p { color: var(--text-2); font-size:1.02rem; max-width:580px; }
+
+  .grid-3 { display:grid; grid-template-columns: repeat(3,1fr); gap: var(--gap-l); }
+  .card { transform-style: preserve-3d; }
+  .card .ic { width:44px; height:44px; border-radius:var(--r); display:grid; place-items:center; margin-bottom:18px; color:var(--blue-2);
+              background: rgba(47,107,255,0.1); border:1px solid rgba(47,107,255,0.28); }
+  .card .ic .ico { width:22px; height:22px; }
+  .card h3 { font-size: 1.12rem; margin-bottom: 10px; }
+  .card p { color: var(--text-2); font-size: 0.94rem; }
+  .card .idx { position:absolute; top:18px; right:20px; font-family:var(--mono); font-size:0.72rem; color:var(--muted); letter-spacing:0.1em; }
+
+  /* flow */
+  .flow { display:flex; align-items:stretch; gap: 8px; flex-wrap:wrap; justify-content:center; }
+  .flow .box { background: rgba(120,150,210,0.04); border:1px solid var(--stroke-2); border-radius: var(--r);
+               padding: 16px 18px; font-size: 0.84rem; font-weight:600; position:relative; display:grid; place-items:center; min-width:118px; text-align:center; transition: all 240ms var(--ease); }
+  .flow .box:hover { transform: translateY(-2px); border-color: var(--blue); }
+  .flow .box.key { background: rgba(47,107,255,0.12); border-color: rgba(47,107,255,0.5); color:#fff; box-shadow: 0 0 22px -8px rgba(47,107,255,0.7); }
+  .flow .box.lit { border-color: var(--cyan); box-shadow: 0 0 22px -8px rgba(56,189,248,0.8); color:#fff; }
+  .flow .arrow { color: var(--muted); display:grid; place-items:center; font-family:var(--mono); }
+  .flow .box .tip { visibility:hidden; opacity:0; transition:200ms; position:absolute; bottom:124%; left:50%; transform:translateX(-50%); background:#0a0e1a; color:#fff; padding:8px 12px; border-radius:var(--r); font-size:0.74rem; font-weight:400; white-space:nowrap; border:1px solid var(--stroke-2); z-index:5; }
+  .flow .box.key:hover .tip { visibility:visible; opacity:1; }
+
+  /* formula */
+  .formula { text-align:center; font-family: var(--mono); font-size: clamp(1.05rem, 2.6vw, 1.65rem); font-weight:600;
+             padding: 44px 24px; position:relative; display:flex; gap:0.5ch; flex-wrap:wrap; justify-content:center; align-items:center;
+             background: radial-gradient(120% 150% at 50% 0%, rgba(47,107,255,0.12), transparent 58%), var(--panel-2);
+             border:1px solid var(--stroke-2); margin-bottom: 22px; }
+  .formula .tok, .formula .op { display:inline-block; }
+  .formula .hlx { color: var(--cyan); }
+
+  details { background: rgba(120,150,210,0.035); border:1px solid var(--stroke); border-radius: var(--r); padding: 16px 18px; margin-bottom: 10px; transition: border-color 200ms var(--ease); }
+  details[open] { border-color: var(--stroke-2); }
+  details summary { cursor:pointer; font-weight:600; list-style:none; display:flex; justify-content:space-between; align-items:center; }
+  details summary::after { content:"+"; color:var(--text-2); font-family:var(--mono); }
+  details[open] summary::after { content:"−"; }
+  details p { color: var(--text-2); margin-top: 12px; font-size: 0.92rem; }
+
+  table { width:100%; border-collapse: collapse; font-size: 0.92rem; }
+  th, td { text-align:left; padding: 14px 16px; border-bottom: 1px solid var(--stroke); }
+  th { color: var(--text-2); font-weight:600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; font-family:var(--mono); }
+  tbody tr { transition: background 150ms var(--ease); }
+  tbody tr:hover { background: rgba(120,150,210,0.04); }
+  td.mono { font-family: var(--mono); color: var(--blue-2); }
+
+  .badges { display:flex; flex-wrap:wrap; gap: 10px; }
+  .badge { background: rgba(120,150,210,0.04); border:1px solid var(--stroke-2); border-radius:var(--r); padding: 9px 15px; font-size: 0.84rem; color:var(--text-2); transition: all 200ms var(--ease); }
+  .badge:hover { border-color: var(--blue); color:var(--text); transform: translateY(-2px); }
+  .badge b { color: var(--text); }
+
+  footer { text-align:center; padding: 96px 0; }
+  footer h2 { font-size: clamp(1.9rem,3.6vw,2.7rem); margin-bottom: 26px; }
+
+  /* GSAP starts elements hidden; .no-anim (reduced motion / no-JS-fail) shows them */
+  .anim { opacity: 0; }
+  .anim.no-anim { opacity: 1; }
+
+  @media (max-width: 900px){
+    .hero { grid-template-columns:1fr; text-align:center; padding-top: 40px; }
+    .hero-copy { text-align:center; }
+    .hero .sub { margin-left:auto; margin-right:auto; }
+    .hero .cta, .hero .stats { justify-content:center; }
+    .globe-stage { order:-1; max-height: 340px; }
+  }
+  @media (max-width: 800px){ .grid-3{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div id="scrollbar"></div>
+<div class="wrap">
+
+  <nav class="topnav">
+    <a href="/" class="logo"><span class="a">AD</span><span class="b">PULSE</span></a>
+    <div class="links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/bidtester">Bid Tester</a>
+      <a class="btn btn-outline" style="padding:9px 18px" href="/dashboard">Launch →</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow reveal">REAL-TIME BIDDING · DSP ENGINE</span>
+      <h1 class="reveal" style="animation-delay:60ms">Bid smarter,<br/>in <span class="hl">under 5 milliseconds</span>.</h1>
+      <p class="sub reveal" style="animation-delay:120ms">
+        ADPULSE pairs two LightGBM models with a budget-aware bidding strategy, then streams every
+        auction decision to a live operator dashboard. Every number is computed by real models — nothing is mocked.
+      </p>
+      <div class="cta reveal" style="animation-delay:180ms">
+        <a class="btn btn-primary" id="ctaMain" href="/dashboard">Open Live Dashboard →</a>
+        <a class="btn btn-outline" href="/bidtester">Test a Bid →</a>
+      </div>
+      <div class="stats reveal" style="animation-delay:240ms">
+        <div class="s"><div class="n">&lt; 5 ms</div><div class="l">Per decision</div></div>
+        <div class="s"><div class="n">2 models</div><div class="l">CTR · CVR</div></div>
+        <div class="s"><div class="n">5</div><div class="l">Advertisers</div></div>
+        <div class="s"><div class="n">100%</div><div class="l">Real inference</div></div>
+      </div>
+    </div>
+
+    <!-- live RTB globe -->
+    <div class="globe-stage">
+      <div class="globe-glow"></div>
+      <div id="globe-hero"></div>
+      <div class="globe-hud">
+        <span class="live-dot off" id="ghDot"></span>
+        <span id="ghLabel">connecting</span>
+        <span class="gh-count" id="ghCount">0</span><span style="color:var(--muted)">bids</span>
+      </div>
+      <div class="globe-cap">live auction flow · green = won</div>
+    </div>
+  </header>
+
+  <!-- WHAT IS RTB -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow anim">01 · THE PROBLEM</span>
+      <h2 class="anim">What is Real-Time Bidding?</h2>
+      <p class="anim">Every webpage load triggers a millisecond auction. Here's the challenge ADPULSE solves.</p>
+    </div>
+    <div class="grid-3">
+      <div class="card framed anim"><span class="idx">01</span>
+        <div class="ic"><svg class="ico" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+        <h3>The Constraint</h3>
+        <p>A fixed budget, and a decision in under 5ms per request: bid or not, and how much. Too aggressive and the budget dies early; too conservative and you lose every auction.</p></div>
+      <div class="card framed anim"><span class="idx">02</span>
+        <div class="ic"><svg class="ico" viewBox="0 0 24 24"><path d="M3 21h18M6 21V8l6-4 6 4v13M9 21v-6h6v6"/></svg></div>
+        <h3>The Auction</h3>
+        <p>A second-price auction — the highest bidder wins but pays the <em>second</em>-highest price. This rewards honest bidding: your best move is to bid your true value.</p></div>
+      <div class="card framed anim"><span class="idx">03</span>
+        <div class="ic"><svg class="ico" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg></div>
+        <h3>The Solution</h3>
+        <p>Two LightGBM models predict click &amp; conversion probability per request. A greedy strategy then prices each bid under the budget constraint.</p></div>
+    </div>
+  </section>
+
+  <!-- FLOW -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow anim">02 · ARCHITECTURE</span>
+      <h2 class="anim">System Flow</h2>
+      <p class="anim">From page load to ad impression — where ADPULSE fits in the pipeline.</p>
+    </div>
+    <div class="flow" id="flow">
+      <div class="box">User loads<br/>page</div><span class="arrow">→</span>
+      <div class="box">Ad<br/>Exchange</div><span class="arrow">→</span>
+      <div class="box">Your<br/>DSP</div><span class="arrow">→</span>
+      <div class="box key">getBidPrice()<span class="tip">CTR model + CVR model + bidding formula</span></div><span class="arrow">→</span>
+      <div class="box">Win /<br/>Lose</div><span class="arrow">→</span>
+      <div class="box">Ad<br/>shown</div>
+    </div>
+  </section>
+
+  <!-- FORMULA -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow anim">03 · THE ENGINE</span>
+      <h2 class="anim">The Bidding Formula</h2>
+      <p class="anim">How a raw bid price is computed for every single request.</p>
+    </div>
+    <div class="formula" id="formula">
+      <span class="tok">bid</span><span class="op">=</span><span class="tok">base_bid</span><span class="op">×</span><span class="tok hlx">CTR</span><span class="op">×</span><span class="tok">(1 + <span class="hlx">N</span> × <span class="hlx">CVR</span>)</span>
+    </div>
+    <p class="muted anim" style="margin-bottom:24px; font-size:0.96rem">
+      CTR acts as the primary gate — if click probability is low, the whole bid shrinks proportionally.
+      The (1 + N × CVR) term scales the bid up for advertisers where conversions matter more.
+      For advertiser <b style="color:var(--text)">3476</b> (N=10), a likely converter can multiply the bid by up to 11×.
+    </p>
+    <details class="anim"><summary>What is CTR?</summary><p>Click-Through Rate — the probability a user clicks after seeing the ad. Typically ~0.1–0.2% in display advertising.</p></details>
+    <details class="anim"><summary>What is CVR?</summary><p>Conversion Rate — given a click, the probability the user completes a desired action like a purchase.</p></details>
+    <details class="anim"><summary>What is N?</summary><p>An advertiser-specific weight for how much a conversion is worth relative to a click. The score we maximise is <span class="mono">Clicks + N × Conversions</span>.</p></details>
+  </section>
+
+  <!-- ADVERTISERS -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow anim">04 · CAMPAIGNS</span>
+      <h2 class="anim">The 5 Advertisers</h2>
+      <p class="anim">Each advertiser has a different N value, driving a distinct bidding strategy.</p>
+    </div>
+    <div class="card framed anim" style="padding:6px 6px 0; overflow:hidden;">
+      <table>
+        <thead><tr><th>Advertiser</th><th>N Value</th><th>Strategy</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">1458</td><td>0</td><td>Clicks only</td><td class="muted">Conversions ignored — bid purely on click probability</td></tr>
+          <tr><td class="mono">3358</td><td>2</td><td>Balanced</td><td class="muted">A conversion is worth 2× a click</td></tr>
+          <tr><td class="mono">3386</td><td>0</td><td>Clicks only</td><td class="muted">Conversions ignored</td></tr>
+          <tr><td class="mono">3427</td><td>0</td><td>Clicks only</td><td class="muted">Conversions ignored</td></tr>
+          <tr><td class="mono">3476</td><td>10</td><td>Conversion-focused</td><td class="muted">Bids up to 11× more aggressively for likely converters</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow anim">05 · STACK</span>
+      <h2 class="anim">Built Lean</h2>
+      <p class="anim">Deployable, fast, and free of unnecessary build steps.</p>
+    </div>
+    <div class="badges">
+      <div class="badge anim"><b>Python</b> — bidding engine</div>
+      <div class="badge anim"><b>LightGBM</b> — CTR / CVR models</div>
+      <div class="badge anim"><b>Flask</b> — REST API</div>
+      <div class="badge anim"><b>Socket.IO</b> — live feed</div>
+      <div class="badge anim"><b>three.js</b> — 3D globe</div>
+      <div class="badge anim"><b>GSAP</b> — motion</div>
+    </div>
+  </section>
+
+  <footer>
+    <span class="eyebrow anim" style="justify-content:center">READY WHEN YOU ARE</span>
+    <h2 class="anim" style="margin-top:14px">See the engine run, live.</h2>
+    <a class="btn btn-primary anim" href="/dashboard">Open Live Dashboard →</a>
+  </footer>
+
+</div>
+
+<!-- libraries -->
+<script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanilla-tilt@1.8.1/dist/vanilla-tilt.min.js"></script>
+
+<script>
+(function () {
+  "use strict";
+  var REDUCE = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- scroll progress bar ---------- */
+  var bar = document.getElementById('scrollbar');
+  function onScrollBar() {
+    var h = document.documentElement;
+    var p = h.scrollTop / ((h.scrollHeight - h.clientHeight) || 1);
+    bar.style.width = (p * 100).toFixed(2) + '%';
+  }
+  window.addEventListener('scroll', onScrollBar, { passive: true });
+  onScrollBar();
+
+  /* ---------- Lenis smooth scroll ---------- */
+  if (!REDUCE && window.Lenis) {
+    try {
+      var lenis = new Lenis({ duration: 1.1, smoothWheel: true });
+      function raf(t){ lenis.raf(t); requestAnimationFrame(raf); }
+      requestAnimationFrame(raf);
+      if (window.ScrollTrigger) lenis.on('scroll', ScrollTrigger.update);
+    } catch (e) {}
+  }
+
+  /* ---------- GSAP scroll reveals ---------- */
+  if (!REDUCE && window.gsap && window.ScrollTrigger) {
+    gsap.registerPlugin(ScrollTrigger);
+    document.querySelectorAll('.anim').forEach(function (el) {
+      gsap.fromTo(el, { autoAlpha: 0, y: 22 }, {
+        autoAlpha: 1, y: 0, duration: 0.8, ease: 'power3.out',
+        scrollTrigger: { trigger: el, start: 'top 88%', once: true }
+      });
+    });
+    // stagger cards within a grid
+    gsap.utils.toArray('.grid-3').forEach(function (grid) {
+      gsap.fromTo(grid.querySelectorAll('.card'), { autoAlpha: 0, y: 28 }, {
+        autoAlpha: 1, y: 0, duration: 0.7, ease: 'power3.out', stagger: 0.12,
+        scrollTrigger: { trigger: grid, start: 'top 82%', once: true }
+      });
+    });
+    // formula tokens assemble one-by-one
+    gsap.fromTo('#formula .tok, #formula .op', { autoAlpha: 0, y: 14, scale: 0.92 }, {
+      autoAlpha: 1, y: 0, scale: 1, duration: 0.5, ease: 'back.out(1.7)', stagger: 0.13,
+      scrollTrigger: { trigger: '#formula', start: 'top 78%', once: true }
+    });
+    // pipeline sweep: light each box left → right
+    var flowBoxes = document.querySelectorAll('#flow .box');
+    ScrollTrigger.create({
+      trigger: '#flow', start: 'top 75%', once: true,
+      onEnter: function () {
+        flowBoxes.forEach(function (b, i) {
+          setTimeout(function () {
+            b.classList.add('lit');
+            setTimeout(function () { if (!b.classList.contains('key')) b.classList.remove('lit'); }, 520);
+          }, i * 230);
+        });
+      }
+    });
+  } else {
+    // reduced motion or libs failed → just show everything
+    document.querySelectorAll('.anim').forEach(function (el) { el.classList.add('no-anim'); });
+  }
+
+  /* ---------- subtle card tilt ---------- */
+  if (!REDUCE && window.VanillaTilt) {
+    try {
+      VanillaTilt.init(document.querySelectorAll('.card'), {
+        max: 4, speed: 600, glare: true, 'max-glare': 0.12, scale: 1.01, gyroscope: false
+      });
+    } catch (e) {}
+  }
+
+  /* ---------- magnetic primary CTA ---------- */
+  if (!REDUCE) {
+    var cta = document.getElementById('ctaMain');
+    if (cta) {
+      cta.addEventListener('mousemove', function (e) {
+        var r = cta.getBoundingClientRect();
+        var x = e.clientX - r.left - r.width / 2;
+        var y = e.clientY - r.top - r.height / 2;
+        cta.style.transform = 'translate(' + (x * 0.18) + 'px,' + (y * 0.28 - 2) + 'px)';
+      });
+      cta.addEventListener('mouseleave', function () { cta.style.transform = ''; });
+    }
+  }
+
+  /* ============================================================
+     LIVE RTB GLOBE
+     ============================================================ */
+  var ghDot = document.getElementById('ghDot');
+  var ghLabel = document.getElementById('ghLabel');
+  var ghCount = document.getElementById('ghCount');
+  var count = 0;
+  function bumpCount() { count++; ghCount.textContent = count > 9999 ? (count/1000).toFixed(1)+'k' : count; }
+
+  var globe = null, ARCS = [], RINGS = [];
+  var COL_WON  = ['rgba(47,211,154,0.95)', 'rgba(56,189,248,0.25)'];
+  var COL_LOST = ['rgba(91,155,255,0.55)', 'rgba(91,155,255,0.02)'];
+  function rnd(a, b) { return Math.random() * (b - a) + a; }
+  function pt() { return { lat: rnd(-55, 72), lng: rnd(-168, 170) }; }
+
+  function initGlobe() {
+    var el = document.getElementById('globe-hero');
+    if (!el || !window.Globe) { return false; }
+    try {
+      globe = Globe()(el)
+        .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-dark.jpg')
+        .bumpImageUrl('https://unpkg.com/three-globe/example/img/earth-topology.png')
+        .backgroundColor('rgba(0,0,0,0)')
+        .showAtmosphere(true).atmosphereColor('#2f6bff').atmosphereAltitude(0.17)
+        .arcColor('color').arcStroke(0.55).arcDashLength(0.45).arcDashGap(0.28)
+        .arcDashAnimateTime(function (d) { return d.won ? 1500 : 2400; })
+        .arcsTransitionDuration(0)
+        .ringColor(function () { return function (t) { return 'rgba(47,211,154,' + (1 - t).toFixed(3) + ')'; }; })
+        .ringMaxRadius('maxR').ringPropagationSpeed('speed').ringRepeatPeriod(800);
+
+      var stage = el.closest('.globe-stage') || el;
+      function sizeGlobe() {
+        var s = Math.min(stage.clientWidth || 0, stage.clientHeight || 0) || 460;
+        globe.width(s).height(s);
+      }
+      sizeGlobe();
+      var c = globe.controls();
+      c.enableZoom = false;
+      c.autoRotate = !REDUCE;
+      c.autoRotateSpeed = 0.55;
+      c.enablePan = false;
+      globe.pointOfView({ lat: 20, lng: 35, altitude: 2.05 }, 0);
+
+      window.addEventListener('resize', sizeGlobe);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  function addBid(ev) {
+    bumpCount();
+    if (!globe) return;
+    var won = ev && ev.result === 'WON';
+    var a = pt(), b = pt();
+    ARCS.push({ startLat: a.lat, startLng: a.lng, endLat: b.lat, endLng: b.lng,
+                color: won ? COL_WON : COL_LOST, won: won });
+    if (ARCS.length > 14) ARCS.shift();
+    globe.arcsData(ARCS.slice());
+    if (won) {
+      RINGS.push({ lat: b.lat, lng: b.lng, maxR: rnd(3.5, 6.5), speed: rnd(2.4, 4) });
+      if (RINGS.length > 9) RINGS.shift();
+      globe.ringsData(RINGS.slice());
+    }
+  }
+
+  var haveGlobe = initGlobe();
+
+  /* ---------- data: live WebSocket, else simulated ---------- */
+  var gotReal = false, simTimer = null;
+  function setState(on, label) {
+    ghDot.classList.toggle('off', !on);
+    ghLabel.textContent = label;
+  }
+  function startSim() {
+    if (simTimer) return;
+    setState(true, 'demo stream');
+    simTimer = setInterval(function () {
+      addBid({ result: Math.random() < 0.45 ? 'WON' : 'LOST' });
+    }, 360);
+  }
+  function stopSim() { if (simTimer) { clearInterval(simTimer); simTimer = null; } }
+
+  if (window.io) {
+    try {
+      var socket = io({ transports: ['websocket', 'polling'] });
+      socket.on('connect', function () { setState(true, 'live · streaming'); });
+      socket.on('bid_result', function (row) {
+        if (!gotReal) { gotReal = true; stopSim(); setState(true, 'live · streaming'); }
+        addBid(row);
+      });
+      socket.on('disconnect', function () { setState(false, 'offline'); if (!gotReal) startSim(); });
+    } catch (e) {}
+  }
+  // fallback if no real events shortly after load (e.g. static deploy)
+  setTimeout(function () { if (!gotReal) startSim(); }, 2200);
+})();
+</script>
+</body>
+</html>
