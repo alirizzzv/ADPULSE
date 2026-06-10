@@ -45,12 +45,19 @@ interactive **3D RTB globe**. Every number is computed by real models — nothin
 
 ## 🎯 What is this?
 
-Every time a webpage loads, a **millisecond auction** happens behind the scenes for the ad slot.
-ADPULSE is the **bidder** in that auction: for each incoming request it must decide — in real time,
-under a fixed budget — **whether to bid and how much**. It does this by predicting the probability
-of a click and a conversion with machine learning, then pricing the bid to maximise advertiser value.
+Every time a webpage loads, a **millisecond auction** happens behind the scenes for the ad slot. ADPULSE is the **bidder** in that auction: for each incoming request it must decide — in real time, under a fixed budget — **whether to bid and how much**. It does this by predicting the probability of a click and a conversion with machine learning, then pricing the bid to maximise advertiser value.
 
 > **The hard part isn't the ML — it's doing it in single-digit milliseconds, under a budget, at the scale of a live auction stream, without ever running out of memory.**
+
+### How RTB Works
+
+Real-Time Bidding (RTB) is an advanced programmatic advertising method that auctions ad impressions in real time as a user loads a webpage or app. The flow involves three key actors:
+
+- **Ad Exchange** — the marketplace. It collects details about each available ad slot (size, URL, audience signals like IP address or cookie ID) and sends a **bid request** to all connected DSPs simultaneously.
+- **Demand-Side Platform (DSP)** — represents advertisers. On receiving a bid request, a DSP evaluates whether the slot matches an advertiser's targeting criteria, decides whether to bid, calculates the optimal price, and fires a **bid response** back within milliseconds.
+- **Auction** — the Ad Exchange ranks all bid responses. The highest bidder wins; their ad is shown to the user.
+
+**ADPULSE is the DSP layer** — the part that does the thinking.
 
 ---
 
@@ -90,7 +97,7 @@ flowchart LR
 **Stack at a glance**
 
 | Layer | Tech |
-|------|------|
+|-------|------|
 | **Bidding engine** | Python · LightGBM (CTR + CVR) · scikit-learn scalers |
 | **API & realtime** | Flask · Flask-SocketIO (live auction feed) |
 | **Data layer** | O(1) streaming reader for IPinYou logs · synthetic fallback |
@@ -127,31 +134,84 @@ bid = base_bid × CTR × (1 + N × CVR)
 - **(1 + N × CVR)** scales the bid up for advertisers where conversions matter more.
 - **N** is an advertiser-specific weight: the score we maximise is `Clicks + N × Conversions`.
 
+### The second-price auction
+
+ADPULSE resolves wins against the historical `Payingprice` — the true market price from the IPinYou logs. In a second-price auction the highest bidder wins but **pays only the second-highest bid**, not their own:
+
+```
+Bidder A: 5  ·  Bidder B: 7  ·  Bidder C: 6
+→ Bidder B wins, pays 6 (the market price)
+```
+
+This means overbidding costs money without improving the win — the formula is designed to bid the true value of each impression, no more.
+
 ---
 
 ## 🏷️ The 5 advertiser campaigns
 
+The optimisation objective is:
+
+> **Maximise: `Clicks + N × Conversions` subject to a fixed budget**
+
 Each advertiser has a different **N**, producing a distinct bidding personality:
 
-| Advertiser | N | Strategy | Behaviour |
-|-----------:|:-:|----------|-----------|
-| `1458` | 0 | Clicks only | Bids purely on click probability |
-| `3358` | 2 | Balanced | A conversion is worth 2× a click |
-| `3386` | 0 | Clicks only | Conversions ignored |
-| `3427` | 0 | Clicks only | Conversions ignored |
-| `3476` | 10 | Conversion-focused | A likely converter can multiply the bid by up to **11×** |
+| Advertiser | N | Industrial Category | Strategy | Behaviour |
+|-----------:|:-:|---------------------|----------|-----------|
+| `1458` | 0 | Local e-commerce | Clicks only | Bids purely on click probability |
+| `3358` | 2 | Software | Balanced | A conversion is worth 2× a click |
+| `3386` | 0 | Global e-commerce | Clicks only | Conversions ignored |
+| `3427` | 0 | Oil | Clicks only | Conversions ignored |
+| `3476` | 10 | Tire | Conversion-focused | A likely converter can multiply the bid by up to **11×** |
+
+---
+
+## 🗂️ Dataset — IPinYou RTB Logs
+
+ADPULSE is trained and evaluated on the **[IPinYou Global RTB Bidding Algorithm Competition](https://contest.ipinyou.com/)** dataset. The logs cover real second-price auctions across seven days (`06`–`12`) and include bid, impression, click, and conversion files.
+
+### Log format
+
+Each row is tab-separated. Key columns:
+
+| Col | Field | Description |
+|-----|-------|-------------|
+| 1 | BidID | Unique identifier for the bid request |
+| 2 | Timestamp | `yyyyMMddHHmmssSSS` |
+| 3 | Logtype | `1` impression · `2` click · `3` conversion |
+| 4 | VisitorID | Cookie-based user ID |
+| 6 | IP | User IP address |
+| 7 | Region | Region code |
+| 9 | Adexchange | Ad exchange identifier |
+| 13 | AdslotID | Ad slot identifier |
+| 14–15 | Adslot size | Width × height in pixels |
+| 16 | Adslotvisibility | 1st / 2nd–10th view / NA |
+| 17 | Adslotformat | Fixed / Pop / Background / Float / NA |
+| 18 | Adslotfloorprice | Minimum price publisher will accept |
+| 20 | Biddingprice | DSP's submitted bid |
+| 21 | Payingprice | Market price (second-highest bid) |
+| 23 | AdvertiserID | Campaign identifier |
+
+> Columns marked with `^` are hashed for anonymisation. Columns 21–22 are only present in impression/click/conversion logs, not bid logs.
+
+### Files
+
+```
+dataset/
+  bid.06.txt  …  bid.12.txt    # Bid logs
+  imp.06.txt  …  imp.12.txt    # Impression logs
+  clk.06.txt  …  clk.12.txt    # Click logs
+  conv.06.txt …  conv.12.txt   # Conversion logs
+```
+
+The app auto-detects logs placed in `dataset/` and switches from the synthetic fallback to real data. See [`dataset/README.md`](dataset/README.md) for the download instructions.
 
 ---
 
 ## 🎓 Real data vs. modeled outcomes (and why)
 
-ADPULSE streams **real [IPinYou](https://contest.ipinyou.com/) impressions** and resolves **wins/losses
-against the real historical market price** (`Payingprice`, a true second-price auction).
+ADPULSE streams **real IPinYou impressions** and resolves **wins/losses against the real historical market price** (`Payingprice`, a true second-price auction).
 
-Clicks and conversions, however, are **modeled from the predicted probabilities** for live visibility —
-because real display CTR is **~0.06 %** (≈1,159 clicks in 1.82 M impressions), far too sparse to render
-in a live view. A single environment flag (`OUTCOME_MODE=real`) switches to **ground-truth labels** for
-offline validation.
+Clicks and conversions, however, are **modeled from the predicted probabilities** for live visibility — because real display CTR is **~0.06 %** (≈1,159 clicks in 1.82 M impressions), far too sparse to render in a live view. A single environment flag (`OUTCOME_MODE=real`) switches to **ground-truth labels** for offline validation.
 
 > This mirrors how production DSP dashboards actually work: **live modeled performance, reconciled with sparse actuals in batch.**
 
@@ -205,8 +265,7 @@ docker run --rm -p 5050:7860 -e PORT=7860 adpulse
 
 ### Use the real dataset (optional)
 
-The app auto-detects IPinYou logs placed in `dataset/` and switches from synthetic to **real** mode.
-See [`dataset/README.md`](dataset/README.md) for the one-file download (`imp.06` + `clk.06` + `conv.06`).
+The app auto-detects IPinYou logs placed in `dataset/` and switches from synthetic to **real** mode. See [`dataset/README.md`](dataset/README.md) for the one-file download (`imp.06` + `clk.06` + `conv.06`).
 
 ---
 
@@ -248,14 +307,14 @@ See [`dataset/README.md`](dataset/README.md) for the one-file download (`imp.06`
 
 ## 🙏 Acknowledgments
 
-- **[IPinYou Global RTB Bidding Algorithm Competition](https://contest.ipinyou.com/)** dataset.
+- **[IPinYou Global RTB Bidding Algorithm Competition](https://contest.ipinyou.com/)** dataset. Copyright 2014 ACM 978-1-4503-2999-6/14/08.
 - Built on a hackathon bidding-submission framework, extended into a full-stack, deployed product.
 
 ---
 
 ## 📜 License & ownership
 
-**© 2026 Ali Husain Rizvi ([@alirizzzv](https://github.com/alirizzzv)) — All Rights Reserved.**
+**© 2026 Ali Husain Rizvi ([@alirizzzv](https://github.com/alirizzzv)) & Nikita Chaurasia ([@nikitayk](https://github.com/nikitayk)) — All Rights Reserved.**
 
 This repository is shared publicly for **demonstration, evaluation, and portfolio purposes only**.
 It is **not** licensed for reuse, copying, modification, or redistribution. Please don't repackage or
@@ -265,8 +324,8 @@ submit this work as your own. See [`LICENSE`](LICENSE) for the full terms.
 
 <div align="center">
 
-**[▶ Open the live demo](https://adpulse-5r4y.onrender.com)** &nbsp;·&nbsp; built by [**@alirizzzv**](https://github.com/alirizzzv)
+**[▶ Open the live demo](https://adpulse-5r4y.onrender.com)** &nbsp;·&nbsp; built by [**@alirizzzv**](https://github.com/alirizzzv) & [**@nikitayk**](https://github.com/nikitayk)
 
-© 2026 Ali Husain Rizvi · All Rights Reserved · not for redistribution
+© 2026 Ali Husain Rizvi & Nikita Chaurasia · All Rights Reserved · not for redistribution
 
 </div>
