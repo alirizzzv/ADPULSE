@@ -27,10 +27,17 @@ jobs:
       - name: Ping /api/health (with retries)
         run: |
           URL="https://adpulse-457r.onrender.com/api/health"
-          for i in 1 2 3 4 5; do
-            code=$(curl -fsS -L --max-time 90 -o /dev/null -w "%{http_code}" "$URL") && {
+          # A *fully cold* Render free instance has to pull the Docker image,
+          # start Python, and load the models before it answers — Render holds
+          # the request open the whole time, so curl just waits. The old 90s
+          # --max-time was shorter than that cold boot, so every retry hit the
+          # same still-booting instance and timed out (a 5x90s run = ~9 min of
+          # "all jobs failed"). Give the first ping enough headroom to actually
+          # wake the box; once it's up, subsequent pings are fast.
+          for i in 1 2 3; do
+            code=$(curl -fsS -L --max-time 240 -o /dev/null -w "%{http_code}" "$URL") && {
               echo "Ping $i: HTTP $code — awake."; exit 0;
             }
-            echo "Ping $i failed (likely cold start), retrying in 20s..."; sleep 20
+            echo "Ping $i failed (likely cold start in progress), retrying in 30s..."; sleep 30
           done
           echo "All pings failed — service may be down."; exit 1
